@@ -1,44 +1,43 @@
 import streamlit as st
-try:
-    import tensorflow as tf
-    from tensorflow.keras.models import load_model
-except ImportError as e:
-    st.error(f"Error: {e}. Please ensure TensorFlow is installed.")
-    st.stop()
-
+import cv2
 import numpy as np
 from PIL import Image
-from io import BytesIO
+from skimage.feature import match_template
 
-# Load the pre-trained model (Make sure to update the path to your actual model)
-MODEL_PATH = 'copy_move_forgery_model.h5'
-
-# Ensure the model is loaded only once to avoid delays during every prediction
-@st.cache_resource
-def load_my_model():
-    model = load_model(MODEL_PATH)
-    return model
-
-model = load_my_model()
-
-# Function to process the uploaded image
+# Function to process the uploaded image (convert to grayscale for simpler processing)
 def process_image(uploaded_image):
     img = Image.open(uploaded_image)
     img = img.convert('RGB')  # Ensure the image is in RGB format
-    img = img.resize((224, 224))  # Resize to fit the model's input size (example: 224x224)
+    img = img.resize((224, 224))  # Resize to fit the processing size (224x224)
     
-    # Convert the image to a numpy array and normalize it
-    img_array = np.array(img) / 255.0  # Normalize
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    # Convert to numpy array
+    img_array = np.array(img)
     return img_array
 
-# Function to detect copy-move forgery
-def detect_forgery(model, img_array):
-    prediction = model.predict(img_array)
-    return prediction
+# Function to perform simple copy-move forgery detection using template matching
+def detect_copy_move_forgery(img_array):
+    gray_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)  # Convert to grayscale
+    
+    # For simplicity, let's use template matching (this can be more complex for actual copy-move forgery)
+    # We split the image into patches and check for duplicated patches
+    patch_size = 32  # Patch size for detection
+    height, width = gray_img.shape
+    
+    for i in range(0, height - patch_size, patch_size):
+        for j in range(0, width - patch_size, patch_size):
+            # Extract a patch
+            patch = gray_img[i:i + patch_size, j:j + patch_size]
+            
+            # Try matching this patch within the rest of the image (template matching)
+            result = match_template(gray_img, patch)
+            # Check if a match is found
+            threshold = 0.9  # Adjust this threshold based on performance needs
+            if np.any(result >= threshold):
+                return True  # Match found, indicating possible forgery
+    return False  # No matches found, no forgery detected
 
 # Streamlit App UI
-st.title("Copy-Move Forgery Detection Using Deep Learning")
+st.title("Copy-Move Forgery Detection Using OpenCV")
 st.write("Upload an image to detect copy-move forgery.")
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
@@ -51,10 +50,10 @@ if uploaded_file is not None:
     st.write("")
     st.write("Classifying... Please wait...")
 
-    # Get prediction from the model
-    prediction = detect_forgery(model, img_array)
+    # Get prediction from the forgery detection function
+    is_forged = detect_copy_move_forgery(img_array)
 
-    if prediction[0] > 0.5:  # Example threshold; adjust based on your model's output
+    if is_forged:
         st.write("Forgery Detected!")
     else:
         st.write("No Forgery Detected!")
