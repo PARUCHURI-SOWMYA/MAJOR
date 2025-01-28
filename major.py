@@ -43,6 +43,8 @@ def detect_copy_move_forgery(img_array):
 
 # Function to mark the forged areas on the image
 def mark_forgery_area(img, forged_regions):
+    # Ensure the image is in RGB mode
+    img = img.convert("RGB")
     draw = ImageDraw.Draw(img)
     
     for (start, end) in forged_regions:
