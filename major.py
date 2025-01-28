@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 from PIL import Image, ImageDraw
-import matplotlib.pyplot as plt
 
 # Function to process the uploaded image
 def process_image(uploaded_image):
