@@ -1,13 +1,14 @@
 import streamlit as st
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
 
 # Function to process the uploaded image
 def process_image(uploaded_image):
     img = Image.open(uploaded_image)
     img = img.convert('RGB')  # Ensure the image is in RGB format
     img = img.resize((224, 224))  # Resize to fit the processing size (224x224)
-    return np.array(img)
+    return np.array(img), img
 
 # Function to compute the Mean Squared Error (MSE) between two patches
 def mse(patchA, patchB):
@@ -21,7 +22,8 @@ def detect_copy_move_forgery(img_array):
     height, width, _ = img_array.shape
     patch_size = 64  # Patch size for comparison
     threshold = 1000  # Threshold for MSE, adjust based on sensitivity
-    
+    forged_regions = []
+
     # Compare each patch with every other patch using MSE
     for i in range(0, height - patch_size, patch_size):
         for j in range(0, width - patch_size, patch_size):
@@ -37,17 +39,36 @@ def detect_copy_move_forgery(img_array):
                     # Compute the MSE between the two patches
                     error = mse(patch, other_patch)
                     if error < threshold:  # Threshold for detecting similar patches
-                        return True  # Match found, indicating possible forgery
-    return False  # No matches found, no forgery detected
+                        forged_regions.append(((i, j), (x, y)))  # Store locations of forged patches
+    return forged_regions
+
+# Function to mark the forged areas on the image
+def mark_forgery_area(img, forged_regions):
+    draw = ImageDraw.Draw(img)
+    
+    for (start, end) in forged_regions:
+        x1, y1 = start
+        x2, y2 = end
+        # Draw rectangles around the forged regions
+        draw.rectangle([x1, y1, x2, y2], outline="red", width=3)
+    
+    return img
 
 # Streamlit App UI
-st.title("Copy-Move Forgery Detection Using MSE")
-st.write("Upload an image to detect copy-move forgery.")
+st.title("Copy-Move Forgery Detection with Marked Forgery Areas")
+st.write("Upload an image to detect copy-move forgery and see the forgery marked.")
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    img_array = process_image(uploaded_file)
+    img_array, img = process_image(uploaded_file)
+
+    # Image details
+    image_type = img.format
+    image_size = img.size  # (width, height)
+    
+    st.write(f"**Image Type:** {image_type}")
+    st.write(f"**Image Dimensions:** {image_size[0]} x {image_size[1]} pixels")
 
     st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
     
@@ -55,9 +76,15 @@ if uploaded_file is not None:
     st.write("Classifying... Please wait...")
 
     # Get prediction from the forgery detection function
-    is_forged = detect_copy_move_forgery(img_array)
+    forged_regions = detect_copy_move_forgery(img_array)
 
-    if is_forged:
-        st.write("Forgery Detected!")
+    if forged_regions:
+        st.write("Forgery Detected! The following areas are marked in the image.")
+        
+        # Mark the forged areas on the image
+        marked_image = mark_forgery_area(img.copy(), forged_regions)
+
+        # Display the marked image
+        st.image(marked_image, caption="Image with Marked Forged Areas", use_column_width=True)
     else:
         st.write("No Forgery Detected!")
