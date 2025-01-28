@@ -50,13 +50,17 @@ def mark_forgery_area(img, forged_regions):
     for (start, end) in forged_regions:
         x1, y1 = start
         x2, y2 = end
-        # Ensure the coordinates are within bounds
-        if x1 < 0: x1 = 0
-        if y1 < 0: y1 = 0
-        if x2 > img.width: x2 = img.width
-        if y2 > img.height: y2 = img.height
+        # Ensure the coordinates are within bounds of the image size
+        x1 = max(0, x1)
+        y1 = max(0, y1)
+        x2 = min(x2, img.width)
+        y2 = min(y2, img.height)
+
         # Draw rectangles around the forged regions
-        draw.rectangle([x1, y1, x2, y2], outline="red", width=3)
+        try:
+            draw.rectangle([x1, y1, x2, y2], outline="red", width=3)
+        except Exception as e:
+            print(f"Error drawing rectangle: {e}")
     
     return img
 
