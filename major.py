@@ -1,13 +1,25 @@
 import streamlit as st
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-import cv2
+try:
+    import tensorflow as tf
+    from tensorflow.keras.models import load_model
+except ImportError as e:
+    st.error(f"Error: {e}. Please ensure TensorFlow is installed.")
+    st.stop()
+
 import numpy as np
 from PIL import Image
 from io import BytesIO
 
-# Load the pre-trained model (You can replace this with your own model)
-model = load_model('copy_move_forgery_model.h5')  # Ensure to save your model
+# Load the pre-trained model (Make sure to update the path to your actual model)
+MODEL_PATH = 'copy_move_forgery_model.h5'
+
+# Ensure the model is loaded only once to avoid delays during every prediction
+@st.cache_resource
+def load_my_model():
+    model = load_model(MODEL_PATH)
+    return model
+
+model = load_my_model()
 
 # Function to process the uploaded image
 def process_image(uploaded_image):
