@@ -1,54 +1,49 @@
 import streamlit as st
-try:
-    import cv2
-except ImportError:
-    st.error("OpenCV is not installed. Please ensure the 'opencv-python-headless' package is installed.")
-    st.stop()
-
-import numpy as np
 from PIL import Image
-from skimage.feature import match_template
+import numpy as np
+import imagehash
 
-# Function to process the uploaded image (convert to grayscale for simpler processing)
+# Function to process the uploaded image
 def process_image(uploaded_image):
     img = Image.open(uploaded_image)
     img = img.convert('RGB')  # Ensure the image is in RGB format
     img = img.resize((224, 224))  # Resize to fit the processing size (224x224)
-    
-    # Convert to numpy array
-    img_array = np.array(img)
-    return img_array
+    return img
 
-# Function to perform simple copy-move forgery detection using template matching
-def detect_copy_move_forgery(img_array):
-    gray_img = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)  # Convert to grayscale
+# Function to compute hash for an image
+def get_image_hash(img):
+    return imagehash.phash(img)  # Perceptual hash to detect similar regions
+
+# Function to check for copy-move forgery based on image hashing
+def detect_copy_move_forgery(img):
+    # Create hash for the original image
+    original_hash = get_image_hash(img)
     
-    # For simplicity, let's use template matching (this can be more complex for actual copy-move forgery)
-    # We split the image into patches and check for duplicated patches
-    patch_size = 32  # Patch size for detection
-    height, width = gray_img.shape
-    
+    # Create small patches of the image and compare hashes
+    patch_size = 64  # Patch size for comparison
+    img_array = np.array(img)
+    height, width, _ = img_array.shape
+
+    # Scan the image by patches
     for i in range(0, height - patch_size, patch_size):
         for j in range(0, width - patch_size, patch_size):
-            # Extract a patch
-            patch = gray_img[i:i + patch_size, j:j + patch_size]
+            patch = img_array[i:i + patch_size, j:j + patch_size]
+            patch_img = Image.fromarray(patch)
+            patch_hash = get_image_hash(patch_img)
             
-            # Try matching this patch within the rest of the image (template matching)
-            result = match_template(gray_img, patch)
-            # Check if a match is found
-            threshold = 0.9  # Adjust this threshold based on performance needs
-            if np.any(result >= threshold):
-                return True  # Match found, indicating possible forgery
-    return False  # No matches found, no forgery detected
+            # Compare hashes for similarity
+            if original_hash - patch_hash < 5:  # Adjust the threshold as needed
+                return True  # Forgery detected
+    return False  # No forgery detected
 
 # Streamlit App UI
-st.title("Copy-Move Forgery Detection Using OpenCV")
+st.title("Copy-Move Forgery Detection Using Image Hashing")
 st.write("Upload an image to detect copy-move forgery.")
 
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    img_array = process_image(uploaded_file)
+    img = process_image(uploaded_file)
 
     st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
     
@@ -56,7 +51,7 @@ if uploaded_file is not None:
     st.write("Classifying... Please wait...")
 
     # Get prediction from the forgery detection function
-    is_forged = detect_copy_move_forgery(img_array)
+    is_forged = detect_copy_move_forgery(img)
 
     if is_forged:
         st.write("Forgery Detected!")
